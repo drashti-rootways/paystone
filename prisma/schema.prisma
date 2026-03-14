@@ -1,0 +1,58 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Note that some adapters may set a maximum length for the String type by default, please ensure your strings are long
+// enough when changing adapters.
+// See https://www.prisma.io/docs/orm/reference/prisma-schema-reference#string for more information
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model Session {
+  id            String    @id
+  shop          String
+  state         String
+  isOnline      Boolean   @default(false)
+  scope         String?
+  expires       DateTime?
+  accessToken   String
+  userId        BigInt?
+  firstName     String?
+  lastName      String?
+  email         String?
+  accountOwner  Boolean   @default(false)
+  locale        String?
+  collaborator  Boolean?  @default(false)
+  emailVerified Boolean?  @default(false)
+}
+
+model Shop {
+  id            BigInt           @id @default(autoincrement())
+  shopDomain    String           @unique
+  created_at    DateTime         @default(now())
+  updated_at    DateTime         @default(now()) @updatedAt
+
+  paystoneConfig  PaystoneConfig?
+}
+
+model PaystoneConfig {
+  id                     Int      @id @default(autoincrement())
+  shopId                 BigInt   @unique  // must match Shop.id type
+  merchantUniqueId       String   // Sandbox - Merchant Unique Identifier (MID)
+  merchantPassword       String   // Sandbox - Merchant Password (MPW)
+  clientAccessKey        String   // Sandbox - Client Access Key
+  gatewayUrl             String   // Sandbox - Gateway URL
+  apiVersion             String   // API Version
+  preAuthTimeoutMinutes  Int      // Pre Authorization Timeout (In Minutes)
+  skipPinVerification    Boolean  // Skip PIN Verification (true/false)
+
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  shop                   Shop     @relation(fields: [shopId], references: [id])
+}

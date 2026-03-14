@@ -1,0 +1,36 @@
+# Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
+
+client_id = "b39ddb8b6eac2eac479848cf48e1e7ae"
+name = "rootways-paystone"
+application_url = " https://stages-cancellation-towers-valentine.trycloudflare.com/extensions/dev-console"
+embedded = true
+
+[build]
+automatically_update_urls_on_dev = true
+
+[webhooks]
+api_version = "2026-01"
+
+  [[webhooks.subscriptions]]
+  topics = [ "app/scopes_update" ]
+  uri = "https://example.com/webhooks/app/scopes_update"
+
+  [[webhooks.subscriptions]]
+  topics = [ "app/uninstalled" ]
+  uri = "https://example.com/webhooks/app/uninstalled"
+
+[access_scopes]
+# Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
+scopes = "write_discounts"
+optional_scopes = [ ]
+use_legacy_install_flow = false
+
+[auth]
+redirect_urls = [
+  " https://stages-cancellation-towers-valentine.trycloudflare.com/extensions/dev-console"
+]
+
+[app_proxy]
+url = " https://stages-cancellation-towers-valentine.trycloudflare.com/extensions/dev-console"
+subpath = "paystone"
+prefix = "apps"

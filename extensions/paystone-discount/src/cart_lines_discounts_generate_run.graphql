@@ -1,0 +1,21 @@
+query CartInput {
+  cart {
+    attribute(key: "paystoneGiftVoucher") {
+      key
+      value
+    }
+
+    lines {
+      id
+      cost {
+        subtotalAmount {
+          amount
+        }
+      }
+    }
+  }
+
+  discount {
+    discountClasses
+  }
+}

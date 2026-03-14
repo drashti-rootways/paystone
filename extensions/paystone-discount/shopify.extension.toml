@@ -1,0 +1,22 @@
+api_version = "2025-04"
+
+[[extensions]]
+name = "t:name"
+handle = "paystone-discount"
+type = "function"
+uid = "a685aa55-871a-5792-9204-bae8bd7b44afa755682c"
+description = "t:description"
+
+  [[extensions.targeting]]
+  target = "cart.lines.discounts.generate.run"
+  input_query = "src/cart_lines_discounts_generate_run.graphql"
+  export = "cart-lines-discounts-generate-run"
+
+  [[extensions.targeting]]
+  target = "cart.delivery-options.discounts.generate.run"
+  input_query = "src/cart_delivery_options_discounts_generate_run.graphql"
+  export = "cart-delivery-options-discounts-generate-run"
+
+  [extensions.build]
+  command = ""
+  path = "dist/function.wasm"
