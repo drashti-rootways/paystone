@@ -38,7 +38,7 @@
 // }
 // app/routes/api/paystone-config.jsx
 // app/routes/app.paystoneapi-config.jsx
-import { authenticate } from "../shopify.server";
+
 import prisma from "../db.server";
 
 export async function loader({ request }) {
