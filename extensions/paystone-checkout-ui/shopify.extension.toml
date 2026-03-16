@@ -13,13 +13,16 @@ type = "ui_extension"
 
 [[extensions.targeting]]
 target = "purchase.checkout.block.render"
-module = "./src/Checkout.jsx"
+module = "./src/checkout.jsx"
 
 [extensions.capabilities]
 api_access = true
+network_access = true
 
 [extensions.network_access]
-network_access = true
+allowed_domains = [
+  "https://paystone.vercel.app"
+]
 
 # Loads metafields on checkout resources, including the cart,
 # products, customers, and more. Learn more:
