@@ -31,6 +31,6 @@ redirect_urls = [
 ]
 
 [app_proxy]
-url = " https://paystone.vercel.app/"
+url = " https://paystone.vercel.app"
 subpath = "paystone"
 prefix = "apps"
