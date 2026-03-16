@@ -118,7 +118,7 @@ function Extension() {
   try {
     const shopDomain = "rootways-plus-demo.myshopify.com";
 
-    const API_BASE = "https://paystone.vercel.app/";
+    const API_BASE = "https://paystone.vercel.app";
 
     const url =
       `${API_BASE}/apps/paystone/app/paystoneapi-config` +
