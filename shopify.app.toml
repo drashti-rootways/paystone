@@ -27,10 +27,10 @@ use_legacy_install_flow = false
 
 [auth]
 redirect_urls = [
-  " https://paystone.vercel.app"
+  " https://paystone.vercel.app/api/auth"
 ]
 
 [app_proxy]
-url = " https://paystone.vercel.app"
+url = " https://paystone.vercel.app/"
 subpath = "paystone"
 prefix = "apps"
