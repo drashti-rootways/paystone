@@ -2,7 +2,7 @@
 
 client_id = "b39ddb8b6eac2eac479848cf48e1e7ae"
 name = "rootways-paystone"
-application_url = " https://paystone.vercel.app"
+application_url = "https://paystone.vercel.app"
 embedded = true
 
 [build]
@@ -27,10 +27,10 @@ use_legacy_install_flow = false
 
 [auth]
 redirect_urls = [
-  " https://paystone.vercel.app/api/auth"
+  "https://paystone.vercel.app/api/auth"
 ]
 
 [app_proxy]
-url = " https://paystone.vercel.app"
+url = "https://paystone.vercel.app"
 subpath = "paystone"
 prefix = "apps"
