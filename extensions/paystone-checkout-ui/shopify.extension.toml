@@ -13,7 +13,7 @@ type = "ui_extension"
 
 [[extensions.targeting]]
 target = "purchase.checkout.block.render"
-module = "./src/checkout.jsx"
+module = "./src/Checkout.jsx"
 
 [extensions.capabilities]
 api_access = true
