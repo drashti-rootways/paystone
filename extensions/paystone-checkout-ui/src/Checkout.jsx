@@ -124,7 +124,7 @@ function Extension() {
     const API_BASE = "https://paystone.vercel.app";
 
     const url =
-      `${API_BASE}/apps/paystone/app/paystoneapi-config` +
+      `${API_BASE}/app/paystoneapi-config` +
       `?voucher=${encodeURIComponent(voucherCode)}` +
       `&shop=${encodeURIComponent(shopDomain)}`;
 
