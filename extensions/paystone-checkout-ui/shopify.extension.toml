@@ -11,7 +11,6 @@ handle = "paystone-checkout-uii"
 uid = "826d50f3-2fd3-5783-ad5e-4639ea88fcb06c136ffa"
 type = "ui_extension"
 
-
 [[extensions.targeting]]
 target = "purchase.checkout.block.render"
 module = "./src/Checkout.jsx"
@@ -20,7 +19,6 @@ module = "./src/Checkout.jsx"
 api_access = true
 network_access = true
 
-console.log("PAYSTONE EXTENSION VERSION: V3");
 # Loads metafields on checkout resources, including the cart,
 # products, customers, and more. Learn more:
 # https://shopify.dev/docs/api/checkout-ui-extensions/latest/configuration#metafields

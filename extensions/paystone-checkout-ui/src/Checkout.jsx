@@ -97,6 +97,7 @@ export default async function () {
 }
 
 function Extension() {
+   console.log("PAYSTONE EXTENSION VERSION: V3"); 
   const [voucher, setVoucher] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
