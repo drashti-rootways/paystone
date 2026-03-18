@@ -43,6 +43,12 @@
 
 import prisma from "../db.server";
 
+function safeJson(data) {
+  return JSON.stringify(data, (_, value) =>
+    typeof value === "bigint" ? value.toString() : value
+  );
+}
+
 /* =========================
    CORS HEADERS
 ========================= */
@@ -76,7 +82,7 @@ export async function loader({ request }) {
 
     if (!shopDomain) {
       return new Response(
-        JSON.stringify({ error: "Missing shop parameter" }),
+        safeJson({ error: "Missing shop parameter" }),
         {
           status: 400,
           headers: corsHeaders,
@@ -93,7 +99,7 @@ export async function loader({ request }) {
 
     if (!shop) {
       return new Response(
-        JSON.stringify({ error: "Shop not found" }),
+        safeJson({ error: "Shop not found" }),
         {
           status: 404,
           headers: corsHeaders,
@@ -114,7 +120,7 @@ export async function loader({ request }) {
        RETURN RESPONSE
     ========================= */
     return new Response(
-      JSON.stringify({
+      safeJson({
         success: true,
         voucher,
         config,
@@ -131,7 +137,7 @@ export async function loader({ request }) {
     console.error("Paystone API Error:", error);
 
     return new Response(
-      JSON.stringify({
+      safeJson({
         success: false,
         error: "Internal Server Error",
       }),
