@@ -102,6 +102,8 @@ function Extension() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [config, setConfig] = useState(null);
+  const [pin, setPin] = useState('');
+  const shouldShowPin = config?.skipPinVerification === true;
 
   function extractValue(input) {
     if (typeof input === 'string') return input;
@@ -170,10 +172,17 @@ function Extension() {
         setLoading(false);
         return;
       }
-
+      
+      // ✅ ADD THIS HERE
+      if (dbConfig?.skipPinVerification && !pin.trim()) {
+        setError("Please enter PIN.");
+        setLoading(false);
+        return;
+      }
       // Save voucher and config as a string in checkout attributes
       const checkoutConfig = {
         voucherCode: voucher,
+         pin,
         ...dbConfig
       };
 
@@ -230,7 +239,16 @@ function Extension() {
             setVoucher(extractValue(v));
           }}
         />
-
+      {shouldShowPin && (
+        <s-text-field
+          label="Enter PIN"
+          value={pin}
+          disabled={loading}
+          onChange={(v) => {
+            setPin(extractValue(v));
+          }}
+        />
+      )}
         {error && <s-text tone="critical">{error}</s-text>}
 
         <s-stack direction="inline" gap="base">
@@ -241,12 +259,6 @@ function Extension() {
             Remove
           </s-button>
         </s-stack>
-
-        {config && (
-          <s-text tone="critical">
-            [Paystone] Current DB Config: {JSON.stringify(config, null, 2)}
-          </s-text>
-        )}
       </s-stack>
     </s-banner>
   );
