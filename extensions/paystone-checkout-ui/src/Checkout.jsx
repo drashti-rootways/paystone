@@ -86,6 +86,8 @@
 //     </s-banner>
 //   );
 // }
+
+//extensions/checkout-ui/src/Checkout.jsx
 import '@shopify/ui-extensions/preact';
 import { render } from 'preact';
 import { useState } from 'preact/hooks';

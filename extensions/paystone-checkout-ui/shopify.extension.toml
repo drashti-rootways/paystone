@@ -18,10 +18,7 @@ module = "./src/Checkout.jsx"
 
 [extensions.capabilities]
 api_access = true
-
-[extensions.capabilities.network_access]
-enabled = true
-allowed_domains = ["https://paystone.vercel.app"]
+network_access = true
 
 # Loads metafields on checkout resources, including the cart,
 # products, customers, and more. Learn more:
