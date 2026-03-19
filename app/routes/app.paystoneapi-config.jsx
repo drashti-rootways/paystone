@@ -78,7 +78,7 @@ function getGeneralUrl(pin, config) {
     `&MPW=${config.merchantPassword}` +
     `&PRG=ppd` +
     `&VDP=TRUE` +
-    `&PIN=${encodeURIComponent(pin)}`
+    `&PIN=${encodeURIComponent(pin)}`+
     `&TRX=bal`
   );
 }
