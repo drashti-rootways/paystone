@@ -38,11 +38,11 @@
 // }
 // app/routes/api/paystone-config.jsx
 // app/routes/app.paystoneapi-config.jsx
-
-// app/routes/app.paystoneapi-config.jsx
-
 import prisma from "../db.server";
 
+/* =========================
+   SAFE JSON (BigInt fix)
+========================= */
 function safeJson(data) {
   return JSON.stringify(data, (_, value) =>
     typeof value === "bigint" ? value.toString() : value
@@ -59,13 +59,38 @@ const corsHeaders = {
 };
 
 /* =========================
-   OPTIONS (Preflight)
+   OPTIONS
 ========================= */
 export function options() {
   return new Response(null, {
     status: 204,
     headers: corsHeaders,
   });
+}
+
+/* =========================
+   HELPER FUNCTIONS
+========================= */
+function getGeneralUrl(pin, config) {
+  return (
+    `https://rootways.dcuat.com/ms2v2/trx/${config.clientAccessKey}/fit/` +
+    `?MID=${config.merchantUniqueId}` +
+    `&MPW=${config.merchantPassword}` +
+    `&PRG=ppd` +
+    `&VDP=TRUE` +
+    `&PIN=${encodeURIComponent(pin)}`
+  );
+}
+
+function getGeneralUrlSecondPart(cid) {
+  return (
+    `&VER=2010-01-06` +
+    `&LNG=en` +
+    `&WAN=1` +
+    `&WSN=1` +
+    `&CID=${encodeURIComponent(cid)}` +
+    `&DAT=`
+  );
 }
 
 /* =========================
@@ -76,17 +101,13 @@ export async function loader({ request }) {
     const url = new URL(request.url);
 
     const shopDomain = url.searchParams.get("shop");
-    const voucher = url.searchParams.get("voucher");
-
-    console.log("API CALLED WITH:", shopDomain, voucher);
+    const voucher = url.searchParams.get("voucher"); // CID
+    const pin = url.searchParams.get("pin");         // PIN
 
     if (!shopDomain) {
       return new Response(
         safeJson({ error: "Missing shop parameter" }),
-        {
-          status: 400,
-          headers: corsHeaders,
-        }
+        { status: 400, headers: corsHeaders }
       );
     }
 
@@ -100,21 +121,36 @@ export async function loader({ request }) {
     if (!shop) {
       return new Response(
         safeJson({ error: "Shop not found" }),
-        {
-          status: 404,
-          headers: corsHeaders,
-        }
+        { status: 404, headers: corsHeaders }
       );
     }
 
     /* =========================
-       LOAD PAYSTONE CONFIG
+       LOAD CONFIG
     ========================= */
     const config = await prisma.paystoneConfig.findUnique({
       where: { shopId: shop.id },
     });
 
-    console.log("Loaded Paystone Config:", config);
+    if (!config) {
+      return new Response(
+        safeJson({ error: "Config not found" }),
+        { status: 404, headers: corsHeaders }
+      );
+    }
+
+    /* =========================
+       BUILD FINAL URL
+    ========================= */
+    let finalUrl = null;
+
+    if (pin && voucher) {
+      finalUrl =
+        getGeneralUrl(pin, config) +
+        getGeneralUrlSecondPart(voucher);
+    }
+
+    console.log("Final Paystone URL:", finalUrl);
 
     /* =========================
        RETURN RESPONSE
@@ -123,7 +159,9 @@ export async function loader({ request }) {
       safeJson({
         success: true,
         voucher,
+        pin,
         config,
+        paystoneUrl: finalUrl,
       }),
       {
         status: 200,

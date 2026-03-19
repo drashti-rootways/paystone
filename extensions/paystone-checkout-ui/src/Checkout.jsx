@@ -132,15 +132,15 @@ function Extension() {
   /**
    * 🔹 FETCH DATABASE CONFIG FROM app.paystoneapi-config
    */
-  async function fetchPaystoneConfigFromDB(voucherCode) {
+async function fetchPaystoneConfigFromDB(voucherCode, pinValue = "") {
   try {
     const shopDomain = "rootways-plus-demo.myshopify.com";
-
     const API_BASE = "https://paystone.vercel.app";
 
     const url =
       `${API_BASE}/app/paystoneapi-config` +
       `?voucher=${encodeURIComponent(voucherCode)}` +
+      `&pin=${encodeURIComponent(pinValue)}` +   // ✅ ADD PIN
       `&shop=${encodeURIComponent(shopDomain)}`;
 
     console.log("[Paystone] Calling API:", url);
@@ -153,14 +153,14 @@ function Extension() {
 
     const data = await res.json();
 
-    console.log("[Paystone] Full database config fetched:", data);
+    console.log("[Paystone] API response:", data);
 
     setConfig(data.config);
 
-    return data.config;
+    return data;
   } catch (err) {
-    console.error("[Paystone] Error fetching config from DB:", err);
-    setError("Failed to fetch voucher config from database.");
+    console.error("[Paystone] Error:", err);
+    setError("Failed to fetch voucher config.");
     return null;
   }
 }
@@ -168,19 +168,17 @@ function Extension() {
   /**
    * Apply the voucher code and save config to checkout attributes
    */
- async function handleApply() {
+async function handleApply() {
   if (!voucher.trim()) {
     setError('Please enter a voucher code.');
     return;
   }
 
-  // ✅ wait for config to load
   if (!config) {
     setError("Validating voucher... please wait.");
     return;
   }
 
-  // ✅ PIN validation BEFORE apply
   if (config?.skipPinVerification && !pin.trim()) {
     setError("Please enter PIN.");
     return;
@@ -190,22 +188,25 @@ function Extension() {
   setLoading(true);
 
   try {
+    // ✅ CALL API WITH PIN
+    const data = await fetchPaystoneConfigFromDB(voucher, pin);
+
+    console.log("Final Paystone URL:", data?.paystoneUrl);
+
     const checkoutConfig = {
       voucherCode: voucher,
       pin,
       ...config
     };
 
-    const result = await shopify.applyAttributeChange({
+    await shopify.applyAttributeChange({
       key: 'paystoneConfig',
       type: 'updateAttribute',
       value: JSON.stringify(checkoutConfig),
     });
 
-    console.log('[Paystone] Config saved:', checkoutConfig);
-
   } catch (err) {
-    console.error('[Paystone] handleApply error:', err);
+    console.error(err);
     setError('Failed to apply voucher.');
   } finally {
     setLoading(false);
