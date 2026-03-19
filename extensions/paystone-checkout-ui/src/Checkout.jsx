@@ -246,7 +246,6 @@ function Extension() {
           onChange={(v) => {
             setError('');
             setVoucher(extractValue(v));
-            setPin(extractValue(v));
           }}
         />
       {shouldShowPin && (
