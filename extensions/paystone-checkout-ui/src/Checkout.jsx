@@ -90,7 +90,7 @@
 //extensions/checkout-ui/src/Checkout.jsx
 import '@shopify/ui-extensions/preact';
 import { render } from 'preact';
-import { useState } from 'preact/hooks';
+import { useState, useEffect } from 'preact/hooks';
 
 export default async function () {
   render(<Extension />, document.body);
@@ -104,6 +104,19 @@ function Extension() {
   const [config, setConfig] = useState(null);
   const [pin, setPin] = useState('');
   const shouldShowPin = config?.skipPinVerification === true;
+
+  useEffect(() => {
+    if (!voucher.trim()) {
+      setConfig(null);
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      fetchPaystoneConfigFromDB(voucher);
+    }, 400);
+
+    return () => clearTimeout(timer);
+  }, [voucher]);
 
   function extractValue(input) {
     if (typeof input === 'string') return input;
@@ -155,52 +168,49 @@ function Extension() {
   /**
    * Apply the voucher code and save config to checkout attributes
    */
-  async function handleApply() {
-    if (!voucher.trim()) {
-      setError('Please enter a voucher code.');
-      return;
-    }
-
-    setError('');
-    setLoading(true);
-
-    try {
-      // ✅ Fetch full PaystoneConfig from database via backend
-      const dbConfig = await fetchPaystoneConfigFromDB(voucher);
-
-      if (!dbConfig) {
-        setLoading(false);
-        return;
-      }
-      
-      // ✅ ADD THIS HERE
-      if (dbConfig?.skipPinVerification && !pin.trim()) {
-        setError("Please enter PIN.");
-        setLoading(false);
-        return;
-      }
-      // Save voucher and config as a string in checkout attributes
-      const checkoutConfig = {
-        voucherCode: voucher,
-         pin,
-        ...dbConfig
-      };
-
-      const result = await shopify.applyAttributeChange({
-        key: 'paystoneConfig', // must be string
-        type: 'updateAttribute',
-        value: JSON.stringify(checkoutConfig),
-      });
-
-      console.log('[Paystone] Config saved to checkout attributes:', checkoutConfig);
-      console.log('[Paystone] Voucher applied result:', result);
-    } catch (err) {
-      console.error('[Paystone] handleApply error:', err);
-      setError('Failed to apply voucher.');
-    } finally {
-      setLoading(false);
-    }
+ async function handleApply() {
+  if (!voucher.trim()) {
+    setError('Please enter a voucher code.');
+    return;
   }
+
+  // ✅ wait for config to load
+  if (!config) {
+    setError("Validating voucher... please wait.");
+    return;
+  }
+
+  // ✅ PIN validation BEFORE apply
+  if (config?.skipPinVerification && !pin.trim()) {
+    setError("Please enter PIN.");
+    return;
+  }
+
+  setError('');
+  setLoading(true);
+
+  try {
+    const checkoutConfig = {
+      voucherCode: voucher,
+      pin,
+      ...config
+    };
+
+    const result = await shopify.applyAttributeChange({
+      key: 'paystoneConfig',
+      type: 'updateAttribute',
+      value: JSON.stringify(checkoutConfig),
+    });
+
+    console.log('[Paystone] Config saved:', checkoutConfig);
+
+  } catch (err) {
+    console.error('[Paystone] handleApply error:', err);
+    setError('Failed to apply voucher.');
+  } finally {
+    setLoading(false);
+  }
+}
 
   /**
    * Remove voucher and reset checkout attribute
@@ -234,9 +244,9 @@ function Extension() {
           value={voucher}
           disabled={loading}
           onChange={(v) => {
-            console.log('[Paystone] TextField changed:', v);
             setError('');
             setVoucher(extractValue(v));
+            setPin(extractValue(v));
           }}
         />
       {shouldShowPin && (
@@ -252,7 +262,10 @@ function Extension() {
         {error && <s-text tone="critical">{error}</s-text>}
 
         <s-stack direction="inline" gap="base">
-          <s-button onClick={handleApply} disabled={loading}>
+          <s-button
+            onClick={handleApply}
+            disabled={loading || !voucher || !config}
+          >
             Apply Voucher
           </s-button>
           <s-button onClick={handleRemove} tone="critical" disabled={loading}>
