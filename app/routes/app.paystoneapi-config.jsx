@@ -144,12 +144,13 @@ export async function loader({ request }) {
     ========================= */
     let finalUrl = null;
 
-    if (pin && voucher) {
+    if (voucher) {
       finalUrl =
-        getGeneralUrl(pin, config) +
+        getGeneralUrl(pin || "", config) +
         getGeneralUrlSecondPart(voucher);
     }
-
+    console.log("PIN:", pin);
+    console.log("Voucher:", voucher);
     console.log("Final Paystone URL:", finalUrl);
 
     /* =========================
