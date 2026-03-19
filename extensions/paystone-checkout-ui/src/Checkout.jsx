@@ -188,14 +188,29 @@ async function handleApply() {
   setLoading(true);
 
   try {
-    // ✅ CALL API WITH PIN
+    // ✅ STEP 1: Get Paystone URL
     const data = await fetchPaystoneConfigFromDB(voucher, pin);
 
-    console.log("Final Paystone URL:", data?.paystoneUrl);
+    const paystoneUrl = data?.paystoneUrl;
 
+    console.log("Final Paystone URL:", paystoneUrl);
+
+    // ✅ STEP 2: CALL MIDDLE API
+    const API_BASE = "https://paystone.vercel.app";
+
+    const checkRes = await fetch(
+      `${API_BASE}/app/paystone-check?url=${encodeURIComponent(paystoneUrl)}`
+    );
+
+    const checkData = await checkRes.json();
+
+    console.log("✅ Paystone Checked Response:", checkData);
+
+    // OPTIONAL: store in checkout
     const checkoutConfig = {
       voucherCode: voucher,
       pin,
+      paystoneResponse: checkData,
       ...config
     };
 
