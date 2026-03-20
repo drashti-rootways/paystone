@@ -72,15 +72,22 @@ export function options() {
    HELPER FUNCTIONS
 ========================= */
 function getGeneralUrl(pin, config) {
-  return (
+  let url =
     `https://rootways.dcuat.com/ms2v2/trx/${config.clientAccessKey}/fit/` +
     `?MID=${config.merchantUniqueId}` +
     `&MPW=${config.merchantPassword}` +
     `&PRG=ppd` +
-    `&VDP=TRUE` +
-    `&PIN=${encodeURIComponent(pin)}`+
-    `&TRX=bal`
-  );
+    `&VDP=TRUE`;
+
+  // ✅ Add PIN only if exists
+  if (pin && pin.trim() !== "") {
+    url += `&PIN=${encodeURIComponent(pin)}`;
+  }
+
+  // ✅ Always add TRX
+  url += `&TRX=bal`;
+
+  return url;
 }
 
 function getGeneralUrlSecondPart(cid) {
