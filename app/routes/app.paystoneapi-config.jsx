@@ -76,18 +76,18 @@ function getGeneralUrl(pin, config) {
     `https://rootways.dcuat.com/ms2v2/trx/${config.clientAccessKey}/fit/` +
     `?MID=${config.merchantUniqueId}` +
     `&MPW=${config.merchantPassword}` +
-    `&PRG=ppd` +
-    `&VDP=TRUE`;
+    `&PRG=ppd`;
+    
+    // ✅ Add PIN only if exists
+    if (pin && pin.trim() !== "") {
+      url += `&VDP=TRUE`;
+      url += `&PIN=${encodeURIComponent(pin)}`;
+    }
 
-  // ✅ Add PIN only if exists
-  if (pin && pin.trim() !== "") {
-    url += `&PIN=${encodeURIComponent(pin)}`;
-  }
+    // ✅ Always add TRX
+    url += `&TRX=bal`;
 
-  // ✅ Always add TRX
-  url += `&TRX=bal`;
-
-  return url;
+    return url;
 }
 
 function getGeneralUrlSecondPart(cid) {
