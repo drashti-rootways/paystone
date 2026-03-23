@@ -144,11 +144,8 @@
 //   console.log("Invalid voucher → remove discount");
 //   return { operations: [] }; // ❌ ensures discount is removed if invalid
 // }
-
 import {
-  DiscountClass,
   OrderDiscountSelectionStrategy,
-  ProductDiscountSelectionStrategy,
 } from '../generated/api';
 
 /**
@@ -156,43 +153,57 @@ import {
  * @returns {import("../generated/api").CartLinesDiscountsGenerateRunResult}
  */
 export function cartLinesDiscountsGenerateRun(input) {
-  console.log("STEP 1: cartLinesDiscountsGenerateRun called");
+  console.log("STEP 1: Function called");
 
-  // The checkout UI extension sets the cart attribute key "paystoneGiftVoucher".
-  // Depending on your function runtime, the attribute may be on input.cart.attributes or input.cart.attribute .
-  // Your original code used `input.cart.attribute.value`; keep using that but also tolerate both shapes:
-  const voucherAttr =
-    input?.cart?.attribute?.value ?? // previous shape
-    input?.cart?.attributes?.find?.((a) => a?.key === "paystoneGiftVoucher")?.value ?? // alternate shape
-    "";
+  // ✅ Get balance from cart attribute
+  const balanceAttr =
+    input?.cart?.attribute?.value ??
+    input?.cart?.attributes?.find?.((a) => a?.key === "paystoneBalance")?.value ??
+    "0";
 
-  console.log("Voucher attribute:", voucherAttr);
+  console.log("Balance attribute:", balanceAttr);
 
-  if (!voucherAttr) {
-    console.log("No voucher → removing any discount");
+  const balance = parseFloat(balanceAttr || "0");
+
+  if (!balance || balance <= 0) {
+    console.log("No balance → no discount");
     return { operations: [] };
   }
 
-  if (voucherAttr === "12345678901234") {
-    console.log("Valid voucher → applying 50% discount");
-    return {
-      operations: [
-        {
-          orderDiscountsAdd: {
-            candidates: [
-              {
-                message: "50% OFF Order (Voucher Applied)",
-                targets: [{ orderSubtotal: { excludedCartLineIds: [] } }],
-                value: { percentage: { value: 50 } },
-              },
-            ],
-            selectionStrategy: OrderDiscountSelectionStrategy.First,
-          },
-        },
-      ],
-    };
-  }
+  // ✅ Get cart total
+  const cartTotal = parseFloat(input.cart.cost.totalAmount.amount);
 
-  console.log("Invalid voucher → remove discount");
-  return { operations: [] };
+  console.log("Cart Total:", cartTotal);
+
+  // ✅ Calculate discount
+  const discountAmount = Math.min(balance, cartTotal);
+
+  console.log("Applying discount:", discountAmount);
+
+  return {
+    operations: [
+      {
+        orderDiscountsAdd: {
+          candidates: [
+            {
+              message: `Voucher Applied (₹${discountAmount} OFF)`,
+              targets: [
+                {
+                  orderSubtotal: {
+                    excludedCartLineIds: [],
+                  },
+                },
+              ],
+              value: {
+                fixedAmount: {
+                  amount: discountAmount,
+                },
+              },
+            },
+          ],
+          selectionStrategy: OrderDiscountSelectionStrategy.First,
+        },
+      },
+    ],
+  };
 }
