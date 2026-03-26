@@ -240,12 +240,14 @@ async function handleApply() {
       }),
     });
 
-    console.log("✅ Balance saved → Reloading checkout");
+   console.log("✅ Balance saved → Triggering cart update");
 
-    // ✅ FORCE FUNCTION RE-RUN
-    setTimeout(() => {
-      window.location.reload();
-    }, 500);
+    // ✅ Trigger Shopify to re-run discount function
+    await shopify.applyAttributeChange({
+      type: "updateAttribute",
+      key: "paystoneTrigger",
+      value: String(Date.now()), // always new → forces refresh
+    });
 
   } catch (err) {
     console.error(err);
