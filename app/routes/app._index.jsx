@@ -28,7 +28,6 @@ export const loader = async ({ request }) => {
   await getOrCreateShop(shopDomain);
 
   try {
-    await ensureDiscount(admin);
     await ensureVoucherDiscount(admin);
     console.log("✅ Discounts ensured");
   } catch (error) {
