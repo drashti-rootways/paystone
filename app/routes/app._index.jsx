@@ -7,47 +7,34 @@ import {getOrCreateShop} from "../ server/shop.server";
 import { ensureVoucherDiscount } from "../ server/ensureVoucherDiscount.server";
 
 export const loader = async ({ request }) => {
-  let admin, session;
+  await authenticate.admin(request);
+// 1️⃣ Authenticate Shopify admin session
+  const { session } = await authenticate.admin(request);
 
-  // ✅ Safe authentication (prevents crash during install)
-  try {
-    const auth = await authenticate.admin(request);
-    admin = auth.admin;
-    session = auth.session;
-  } catch (error) {
-    console.log("⚠️ Auth not ready yet, skipping...");
-    return null;
-  }
-
-  // ✅ Validate shop
+  // 2️⃣ Extract shop domain
   const shopDomain = session?.shop;
+  console.log("🟢 Authenticated shop domain:", shopDomain);
 
   if (!shopDomain) {
-    console.log("⚠️ No shop domain found");
-    return null;
+    console.error("❌ No shop domain found in session");
+    throw new Response("Shop not found", { status: 400 });
   }
 
-  console.log("🟢 Shop:", shopDomain);
+  // 3️⃣ Create or get shop record in DB
+  await getOrCreateShop(shopDomain);
 
-  // ✅ Ensure shop exists in DB
+  // 4️⃣ ✅ CREATE / ENSURE DISCOUNTS
   try {
-    await getOrCreateShop(shopDomain);
+    await ensureVoucherDiscount(admin);    // Voucher discount
+    console.log("✅ All discounts ensured");
   } catch (error) {
-    console.error("❌ Shop DB error:", error);
+    console.error("❌ Discount creation failed:", error);
   }
 
-  // ✅ Ensure voucher discount exists
-  try {
-    if (admin) {
-      await ensureVoucherDiscount(admin);
-      console.log("✅ Voucher discount ensured");
-    }
-  } catch (error) {
-    console.error("❌ Discount error:", error);
-  }
-
+  // 4️⃣ Return success
   return null;
 };
+
 export const action = async ({ request }) => {
   const { admin } = await authenticate.admin(request);
   const color = ["Red", "Orange", "Yellow", "Green"][
