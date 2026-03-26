@@ -26,6 +26,7 @@ export const loader = async ({ request }) => {
   // 4️⃣ ✅ CREATE / ENSURE DISCOUNTS
   try {
     await ensureVoucherDiscount(admin);    // Voucher discount
+
     console.log("✅ All discounts ensured");
   } catch (error) {
     console.error("❌ Discount creation failed:", error);
