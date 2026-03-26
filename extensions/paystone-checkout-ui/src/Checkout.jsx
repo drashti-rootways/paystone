@@ -206,19 +206,46 @@ async function handleApply() {
 
     console.log("✅ Paystone Checked Response:", checkData);
 
-    // OPTIONAL: store in checkout
-    const checkoutConfig = {
+   // ✅ Extract BAL from response
+function extractBalance(raw) {
+  const params = new URLSearchParams(raw);
+  return parseFloat(params.get("BAL") || "0");
+}
+
+const balance = extractBalance(checkData.raw);
+
+console.log("💰 Extracted Balance:", balance);
+
+// ❌ If invalid voucher
+if (!balance || balance <= 0) {
+  setError("Invalid or empty voucher");
+  setLoading(false);
+  return;
+}
+
+  // ✅ SAVE BALANCE (THIS WAS MISSING ❗)
+  await shopify.applyAttributeChange({
+    type: "updateAttribute",
+    key: "paystoneBalance",
+    value: String(balance),
+  });
+
+  // (optional) keep your config if needed
+  await shopify.applyAttributeChange({
+    type: "updateAttribute",
+    key: "paystoneConfig",
+    value: JSON.stringify({
       voucherCode: voucher,
       pin,
-      paystoneResponse: checkData,
-      ...config
-    };
+    }),
+  });
 
-    await shopify.applyAttributeChange({
-      key: 'paystoneConfig',
-      type: 'updateAttribute',
-      value: JSON.stringify(checkoutConfig),
-    });
+  console.log("✅ Attribute saved → Reloading checkout");
+
+  // ✅ FORCE FUNCTION TO RUN
+  setTimeout(() => {
+    window.location.reload();
+  }, 500);
 
   } catch (err) {
     console.error(err);
