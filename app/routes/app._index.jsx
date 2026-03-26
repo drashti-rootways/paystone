@@ -3,8 +3,8 @@ import { useFetcher } from "react-router";
 import { useAppBridge } from "@shopify/app-bridge-react";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
-import {getOrCreateShop} from "../ server/shop.server"
-
+import {getOrCreateShop} from "../ server/shop.server";
+import { ensureVoucherDiscount } from "../ server/ensureVoucherDiscount.server";
 
 export const loader = async ({ request }) => {
   await authenticate.admin(request);
@@ -22,6 +22,14 @@ export const loader = async ({ request }) => {
 
   // 3️⃣ Create or get shop record in DB
   await getOrCreateShop(shopDomain);
+
+  // 4️⃣ ✅ CREATE / ENSURE DISCOUNTS
+  try {
+    await ensureVoucherDiscount(admin);    // Voucher discount
+    console.log("✅ All discounts ensured");
+  } catch (error) {
+    console.error("❌ Discount creation failed:", error);
+  }
 
   // 4️⃣ Return success
   return null;
