@@ -9,34 +9,45 @@ import { ensureVoucherDiscount } from "../ server/ensureVoucherDiscount.server";
 export const loader = async ({ request }) => {
   let admin, session;
 
+  // ✅ Safe authentication (prevents crash during install)
   try {
     const auth = await authenticate.admin(request);
     admin = auth.admin;
     session = auth.session;
   } catch (error) {
-    console.log("⚠️ Auth not ready yet, skipping discount creation");
-    return null; // 👈 VERY IMPORTANT
-  }
-
-  const shopDomain = session?.shop;
-
-  if (!shopDomain) {
-    console.log("⚠️ No shop domain yet");
+    console.log("⚠️ Auth not ready yet, skipping...");
     return null;
   }
 
-  await getOrCreateShop(shopDomain);
+  // ✅ Validate shop
+  const shopDomain = session?.shop;
 
+  if (!shopDomain) {
+    console.log("⚠️ No shop domain found");
+    return null;
+  }
+
+  console.log("🟢 Shop:", shopDomain);
+
+  // ✅ Ensure shop exists in DB
   try {
-    await ensureVoucherDiscount(admin);
-    console.log("✅ Discounts ensured");
+    await getOrCreateShop(shopDomain);
+  } catch (error) {
+    console.error("❌ Shop DB error:", error);
+  }
+
+  // ✅ Ensure voucher discount exists
+  try {
+    if (admin) {
+      await ensureVoucherDiscount(admin);
+      console.log("✅ Voucher discount ensured");
+    }
   } catch (error) {
     console.error("❌ Discount error:", error);
   }
 
   return null;
 };
-
 export const action = async ({ request }) => {
   const { admin } = await authenticate.admin(request);
   const color = ["Red", "Orange", "Yellow", "Green"][
