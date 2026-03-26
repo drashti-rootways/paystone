@@ -7,28 +7,32 @@ import {getOrCreateShop} from "../ server/shop.server";
 import { ensureVoucherDiscount } from "../ server/ensureVoucherDiscount.server";
 
 export const loader = async ({ request }) => {
-  // ✅ ONLY ONE CALL
-  const { admin, session } = await authenticate.admin(request);
+  let admin, session;
 
-  const shopDomain = session?.shop;
-  console.log("🟢 Authenticated shop domain:", shopDomain);
-
-  if (!shopDomain) {
-    console.error("❌ No shop domain found in session");
-    throw new Response("Shop not found", { status: 400 });
+  try {
+    const auth = await authenticate.admin(request);
+    admin = auth.admin;
+    session = auth.session;
+  } catch (error) {
+    console.log("⚠️ Auth not ready yet, skipping discount creation");
+    return null; // 👈 VERY IMPORTANT
   }
 
-  // ✅ DB
+  const shopDomain = session?.shop;
+
+  if (!shopDomain) {
+    console.log("⚠️ No shop domain yet");
+    return null;
+  }
+
   await getOrCreateShop(shopDomain);
 
-  // ✅ DISCOUNTS
   try {
     await ensureDiscount(admin);
     await ensureVoucherDiscount(admin);
-
     console.log("✅ Discounts ensured");
   } catch (error) {
-    console.error("❌ Discount creation failed:", error);
+    console.error("❌ Discount error:", error);
   }
 
   return null;
