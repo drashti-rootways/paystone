@@ -7,11 +7,9 @@ import {getOrCreateShop} from "../ server/shop.server";
 import { ensureVoucherDiscount } from "../ server/ensureVoucherDiscount.server";
 
 export const loader = async ({ request }) => {
-  await authenticate.admin(request);
-// 1️⃣ Authenticate Shopify admin session
-  const { session } = await authenticate.admin(request);
+  // ✅ ONLY ONE CALL
+  const { admin, session } = await authenticate.admin(request);
 
-  // 2️⃣ Extract shop domain
   const shopDomain = session?.shop;
   console.log("🟢 Authenticated shop domain:", shopDomain);
 
@@ -20,18 +18,19 @@ export const loader = async ({ request }) => {
     throw new Response("Shop not found", { status: 400 });
   }
 
-  // 3️⃣ Create or get shop record in DB
+  // ✅ DB
   await getOrCreateShop(shopDomain);
 
-  // 4️⃣ ✅ CREATE / ENSURE DISCOUNTS
+  // ✅ DISCOUNTS
   try {
-    await ensureVoucherDiscount(admin);    // Voucher discount
-    console.log("✅ All discounts ensured");
+    await ensureDiscount(admin);
+    await ensureVoucherDiscount(admin);
+
+    console.log("✅ Discounts ensured");
   } catch (error) {
     console.error("❌ Discount creation failed:", error);
   }
 
-  // 4️⃣ Return success
   return null;
 };
 
