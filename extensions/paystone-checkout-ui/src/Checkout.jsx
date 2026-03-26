@@ -206,46 +206,46 @@ async function handleApply() {
 
     console.log("✅ Paystone Checked Response:", checkData);
 
-   // ✅ Extract BAL from response
-function extractBalance(raw) {
-  const params = new URLSearchParams(raw);
-  return parseFloat(params.get("BAL") || "0");
-}
+   // ✅ Extract BAL from Paystone response
+    function extractBalance(raw) {
+      const params = new URLSearchParams(raw);
+      return parseFloat(params.get("BAL") || "0");
+    }
 
-const balance = extractBalance(checkData.raw);
+    const balance = extractBalance(checkData.raw);
 
-console.log("💰 Extracted Balance:", balance);
+    console.log("💰 Extracted Balance:", balance);
 
-// ❌ If invalid voucher
-if (!balance || balance <= 0) {
-  setError("Invalid or empty voucher");
-  setLoading(false);
-  return;
-}
+    // ❌ Invalid voucher
+    if (!balance || balance <= 0) {
+      setError("Invalid or empty voucher");
+      setLoading(false);
+      return;
+    }
 
-  // ✅ SAVE BALANCE (THIS WAS MISSING ❗)
-  await shopify.applyAttributeChange({
-    type: "updateAttribute",
-    key: "paystoneBalance",
-    value: String(balance),
-  });
+    // ✅ SAVE BALANCE (VERY IMPORTANT)
+    await shopify.applyAttributeChange({
+      type: "updateAttribute",
+      key: "paystoneBalance",
+      value: String(balance),
+    });
 
-  // (optional) keep your config if needed
-  await shopify.applyAttributeChange({
-    type: "updateAttribute",
-    key: "paystoneConfig",
-    value: JSON.stringify({
-      voucherCode: voucher,
-      pin,
-    }),
-  });
+    // (Optional) save voucher info
+    await shopify.applyAttributeChange({
+      type: "updateAttribute",
+      key: "paystoneConfig",
+      value: JSON.stringify({
+        voucherCode: voucher,
+        pin,
+      }),
+    });
 
-  console.log("✅ Attribute saved → Reloading checkout");
+    console.log("✅ Balance saved → Reloading checkout");
 
-  // ✅ FORCE FUNCTION TO RUN
-  setTimeout(() => {
-    window.location.reload();
-  }, 500);
+    // ✅ FORCE FUNCTION RE-RUN
+    setTimeout(() => {
+      window.location.reload();
+    }, 500);
 
   } catch (err) {
     console.error(err);

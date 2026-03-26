@@ -165,7 +165,7 @@ export function cartLinesDiscountsGenerateRun(input) {
   /* =========================
      READ BALANCE ATTRIBUTE
   ========================= */
-  const balanceAttr =
+const balanceAttr =
   input?.cart?.attributes?.find((a) => a?.key === "paystoneBalance")?.value ?? "0";
 
   console.log("Balance Attribute:", balanceAttr);
