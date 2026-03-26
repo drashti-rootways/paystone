@@ -224,10 +224,11 @@ async function handleApply() {
     }
 
     // ✅ SAVE BALANCE (VERY IMPORTANT)
-    await shopify.applyAttributeChange({
-      type: "updateAttribute",
-      key: "paystoneBalance",
-      value: String(balance),
+   await shopify.applyNoteChange({
+      type: "updateNote",
+      note: JSON.stringify({
+        paystoneBalance: balance,
+      }),
     });
 
     // (Optional) save voucher info

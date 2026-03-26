@@ -163,14 +163,18 @@ export function cartLinesDiscountsGenerateRun(input) {
   console.log("Discount Classes:", input?.discount?.discountClasses);
 
   /* =========================
-     READ BALANCE ATTRIBUTE
+    READ BALANCE FROM CART NOTE ✅
   ========================= */
-const balanceAttr =
-  input?.cart?.attributes?.find((a) => a?.key === "paystoneBalance")?.value ?? "0";
+  let balance = 0;
 
-  console.log("Balance Attribute:", balanceAttr);
+  try {
+    const note = JSON.parse(input?.cart?.note || "{}");
+    balance = parseFloat(note.paystoneBalance || "0");
+  } catch (e) {
+    balance = 0;
+  }
 
-  const balance = parseFloat(balanceAttr || "0");
+  console.log("💰 Balance from note:", balance);
 
   if (!balance || balance <= 0) {
     console.log("❌ No balance → No discount applied");
