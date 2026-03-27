@@ -260,26 +260,42 @@ async function handleApply() {
   /**
    * Remove voucher and reset checkout attribute
    */
-  async function handleRemove() {
-    setVoucher('');
-    setError('');
-    setLoading(true);
+async function handleRemove() {
+  setVoucher('');
+  setError('');
+  setLoading(true);
 
-    try {
-      const result = await shopify.applyAttributeChange({
-        key: 'paystoneConfig',
-        type: 'updateAttribute',
-        value: '',
-      });
+  try {
+    // ❌ REMOVE BALANCE (MOST IMPORTANT)
+    await shopify.applyAttributeChange({
+      type: "updateAttribute",
+      key: "paystoneBalance",
+      value: "0", // or "" both work
+    });
 
-      console.log('[Paystone] Voucher removed from checkout attributes:', result);
-      setConfig(null);
-    } catch (err) {
-      console.error('[Paystone] handleRemove error:', err);
-    } finally {
-      setLoading(false);
-    }
+    // (optional) remove config
+    await shopify.applyAttributeChange({
+      type: "updateAttribute",
+      key: "paystoneConfig",
+      value: "",
+    });
+
+    // ✅ TRIGGER FUNCTION AGAIN (VERY IMPORTANT)
+    await shopify.applyAttributeChange({
+      type: "updateAttribute",
+      key: "paystoneTrigger",
+      value: String(Date.now()),
+    });
+
+    console.log("🧹 Voucher removed & discount reset");
+
+    setConfig(null);
+  } catch (err) {
+    console.error('[Paystone] handleRemove error:', err);
+  } finally {
+    setLoading(false);
   }
+}
 
   return (
     <s-banner heading="Paystone Gift Voucher">
