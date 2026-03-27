@@ -1,224 +1,111 @@
-// import {
-//   DiscountClass,
-//   OrderDiscountSelectionStrategy,
-//   ProductDiscountSelectionStrategy,
-// } from '../generated/api';
-
-
-// /**
-//   * @typedef {import("../generated/api").CartInput} RunInput
-//   * @typedef {import("../generated/api").CartLinesDiscountsGenerateRunResult} CartLinesDiscountsGenerateRunResult
-//   */
-
-// /**
-//   * @param {RunInput} input
-//   * @returns {CartLinesDiscountsGenerateRunResult}
-//   */
-
-// export function cartLinesDiscountsGenerateRun(input) {
-//   if (!input.cart.lines.length) {
-//     throw new Error('No cart lines found');
-//   }
-
-//   const hasOrderDiscountClass = input.discount.discountClasses.includes(
-//     DiscountClass.Order,
-//   );
-//   const hasProductDiscountClass = input.discount.discountClasses.includes(
-//     DiscountClass.Product,
-//   );
-
-//   if (!hasOrderDiscountClass && !hasProductDiscountClass) {
-//     return {operations: []};
-//   }
-
-//   const maxCartLine = input.cart.lines.reduce((maxLine, line) => {
-//     if (Number.parseFloat(line.cost.subtotalAmount.amount) > Number.parseFloat(maxLine.cost.subtotalAmount.amount)) {
-//       return line;
-//     }
-//     return maxLine;
-//   }, input.cart.lines[0]);
-
-//   const operations = [];
-
-//   if (hasOrderDiscountClass) {
-//     operations.push({
-//       orderDiscountsAdd: {
-//         candidates: [
-//           {
-//             message: '10% OFF ORDER',
-//             targets: [
-//               {
-//                 orderSubtotal: {
-//                   excludedCartLineIds: [],
-//                 },
-//               },
-//             ],
-//             value: {
-//               percentage: {
-//                 value: 10,
-//               },
-//             },
-//           },
-//         ],
-//         selectionStrategy: OrderDiscountSelectionStrategy.First,
-//       },
-//     });
-//   }
-
-//   if (hasProductDiscountClass) {
-//     operations.push({
-//       productDiscountsAdd: {
-//         candidates: [
-//           {
-//             message: '20% OFF PRODUCT',
-//             targets: [
-//               {
-//                 cartLine: {
-//                   id: maxCartLine.id,
-//                 },
-//               },
-//             ],
-//             value: {
-//               percentage: {
-//                 value: 20,
-//               },
-//             },
-//           },
-//         ],
-//         selectionStrategy: ProductDiscountSelectionStrategy.First,
-//       },
-//     });
-//   }
-
-//   return {
-//     operations,
-//   };
-// }
-
-
-// import {
-//   DiscountClass,
-//   OrderDiscountSelectionStrategy,
-//   ProductDiscountSelectionStrategy,
-// } from '../generated/api';
-
-// /**
-//  * @param {import("../generated/api").CartInput} input
-//  * @returns {import("../generated/api").CartLinesDiscountsGenerateRunResult}
-//  */
-// export function cartLinesDiscountsGenerateRun(input) {
-//   console.log("STEP 1: cartLinesDiscountsGenerateRun called");
-
-//   // Get voucher from cart attribute
-//   const voucherAttr = input?.cart?.attribute?.value;
-//   console.log("Voucher attribute:", voucherAttr);
-
-//   // If voucher is empty → remove discount
-//   if (!voucherAttr) {
-//     console.log("No voucher → removing any discount");
-//     return { operations: [] }; // ✅ this removes discount from total
-//   }
-
-//   // Only apply discount if voucher matches
-//   if (voucherAttr === "12345678901234") {
-//     console.log("Valid voucher → applying 50% discount");
-//     // ... existing logic to apply order/product discount
-//     return {
-//       operations: [
-//         {
-//           orderDiscountsAdd: {
-//             candidates: [
-//               {
-//                 message: "50% OFF Order (Voucher Applied)",
-//                 targets: [{ orderSubtotal: { excludedCartLineIds: [] } }],
-//                 value: { percentage: { value: 50 } },
-//               },
-//             ],
-//             selectionStrategy: OrderDiscountSelectionStrategy.First,
-//           },
-//         },
-//       ],
-//     };
-//   }
-
-//   console.log("Invalid voucher → remove discount");
-//   return { operations: [] }; // ❌ ensures discount is removed if invalid
-// }
 import {
   DiscountClass,
   OrderDiscountSelectionStrategy,
 } from '../generated/api';
 
-export function cartLinesDiscountsGenerateRun(input) {
-  console.log("🔥 FUNCTION TRIGGERED");
+function parseNumber(value) {
+  const parsed = Number.parseFloat(value ?? '0');
+  return Number.isFinite(parsed) ? parsed : 0;
+}
 
-  /* =========================
-     READ BALANCE ✅
-  ========================= */
-  let balance = 0;
+function parseJson(value) {
+  if (!value) {
+    return null;
+  }
 
   try {
-    balance = parseFloat(
-      input?.cart?.attribute?.value || "0"
-    );
-  } catch (e) {
-    balance = 0;
+    return JSON.parse(value);
+  } catch (error) {
+    console.error('Invalid Paystone JSON attribute', error);
+    return null;
+  }
+}
+
+function getLockedTransaction(input) {
+  const lockData = parseJson(input?.cart?.lock?.value);
+
+  if (!lockData || Number(lockData.status) !== 1) {
+    return null;
   }
 
-  console.log("💰 Balance:", balance);
-
-  if (!balance || balance <= 0) {
-    console.log("❌ No balance");
-    return { operations: [] };
+  const amount = parseNumber(lockData.amt);
+  if (amount <= 0) {
+    return null;
   }
 
-  /* =========================
-     CART TOTAL
-  ========================= */
-  const cartTotal = parseFloat(
-    input?.cart?.cost?.totalAmount?.amount || "0"
-  );
+  return {
+    amount,
+    cid: lockData.cid || '',
+    voucherCode: lockData.voucherCode || '',
+  };
+}
 
-  console.log("🛒 Cart Total:", cartTotal);
+function getDiscountContext(input) {
+  const lockedTransaction = getLockedTransaction(input);
+  if (lockedTransaction) {
+    return lockedTransaction;
+  }
 
-  const discountAmount = Math.min(balance, cartTotal);
+  const balance = parseNumber(input?.cart?.balance?.value);
+  if (balance <= 0) {
+    return null;
+  }
 
-  console.log("💸 Discount:", discountAmount);
+  const config = parseJson(input?.cart?.config?.value);
 
-  /* =========================
-     APPLY ORDER DISCOUNT
-  ========================= */
-  if (
-    input.discount.discountClasses.includes(DiscountClass.Order)
-  ) {
-    return {
-      operations: [
-        {
-          orderDiscountsAdd: {
-            candidates: [
-              {
-                message: `Voucher Applied (₹${discountAmount})`,
-                targets: [
-                  {
-                    orderSubtotal: {
-                      excludedCartLineIds: [],
-                    },
-                  },
-                ],
-                value: {
-                  fixedAmount: {
-                    amount: discountAmount,
+  return {
+    amount: balance,
+    cid: config?.cid || '',
+    voucherCode: config?.voucherCode || '',
+  };
+}
+
+export function cartLinesDiscountsGenerateRun(input) {
+  if (!input?.discount?.discountClasses?.includes(DiscountClass.Order)) {
+    return {operations: []};
+  }
+
+  const context = getDiscountContext(input);
+  if (!context) {
+    return {operations: []};
+  }
+
+  const cartTotal = parseNumber(input?.cart?.cost?.totalAmount?.amount);
+  const discountAmount = Math.min(context.amount, cartTotal);
+
+  if (discountAmount <= 0) {
+    return {operations: []};
+  }
+
+  const identifier = context.voucherCode || context.cid;
+  const message = identifier
+    ? `Voucher Applied (${identifier})`
+    : 'Voucher Applied';
+
+  return {
+    operations: [
+      {
+        orderDiscountsAdd: {
+          candidates: [
+            {
+              message,
+              targets: [
+                {
+                  orderSubtotal: {
+                    excludedCartLineIds: [],
                   },
                 },
+              ],
+              value: {
+                fixedAmount: {
+                  amount: discountAmount,
+                },
               },
-            ],
-            selectionStrategy:
-              OrderDiscountSelectionStrategy.First,
-          },
+            },
+          ],
+          selectionStrategy: OrderDiscountSelectionStrategy.First,
         },
-      ],
-    };
-  }
-
-  return { operations: [] };
+      },
+    ],
+  };
 }

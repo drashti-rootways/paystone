@@ -1,6 +1,14 @@
 query CartInput {
   cart {
-    attribute(key: "paystoneBalance") {
+    balance: attribute(key: "paystoneBalance") {
+      value
+    }
+
+    lock: attribute(key: "paystoneLock") {
+      value
+    }
+
+    config: attribute(key: "paystoneConfig") {
       value
     }
 
