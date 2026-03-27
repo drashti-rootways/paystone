@@ -172,7 +172,7 @@ export function cartLinesDiscountsGenerateRun(input) {
       (attr) => attr.key === "paystoneBalance"
     );
 
-    const balance = parseFloat(attribute?.value || "0");
+    balance = parseFloat(attribute?.value || "0");
   } catch (e) {
     balance = 0;
   }
