@@ -168,13 +168,16 @@ export function cartLinesDiscountsGenerateRun(input) {
   let balance = 0;
 
   try {
-    const note = JSON.parse(input?.cart?.note || "{}");
-    balance = parseFloat(note.paystoneBalance || "0");
+    const attribute = input?.cart?.attributes?.find(
+      (attr) => attr.key === "paystoneBalance"
+    );
+
+    const balance = parseFloat(attribute?.value || "0");
   } catch (e) {
     balance = 0;
   }
 
-  console.log("💰 Balance from note:", balance);
+  console.log("💰 Balance from attributes:", balance);
 
   if (!balance || balance <= 0) {
     console.log("❌ No balance → No discount applied");
