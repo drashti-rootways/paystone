@@ -1,7 +1,6 @@
 query CartInput {
   cart {
-    attributes {
-      key
+    attribute(key: "paystoneBalance") {
       value
     }
 

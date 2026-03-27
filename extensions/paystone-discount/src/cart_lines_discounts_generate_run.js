@@ -152,19 +152,15 @@ import {
 export function cartLinesDiscountsGenerateRun(input) {
   console.log("🔥 FUNCTION TRIGGERED");
 
-  console.log("🧾 Attributes:", input?.cart?.attributes);
-
   /* =========================
      READ BALANCE ✅
   ========================= */
   let balance = 0;
 
   try {
-    const attr = input?.cart?.attributes?.find(
-      (a) => a.key === "paystoneBalance" // ⚠️ MUST MATCH EXTENSION
+    balance = parseFloat(
+      input?.cart?.attribute?.value || "0"
     );
-
-    balance = parseFloat(attr?.value || "0");
   } catch (e) {
     balance = 0;
   }
