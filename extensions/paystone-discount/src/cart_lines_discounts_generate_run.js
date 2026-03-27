@@ -147,121 +147,82 @@
 import {
   DiscountClass,
   OrderDiscountSelectionStrategy,
-  ProductDiscountSelectionStrategy,
 } from '../generated/api';
 
-/**
- * @param {import("../generated/api").CartInput} input
- * @returns {import("../generated/api").CartLinesDiscountsGenerateRunResult}
- */
 export function cartLinesDiscountsGenerateRun(input) {
   console.log("🔥 FUNCTION TRIGGERED");
 
-  /* =========================
-     DEBUG: DISCOUNT CLASSES
-  ========================= */
-  console.log("Discount Classes:", input?.discount?.discountClasses);
+  console.log("🧾 Attributes:", input?.cart?.attributes);
 
   /* =========================
-    READ BALANCE FROM CART NOTE ✅
+     READ BALANCE ✅
   ========================= */
   let balance = 0;
 
   try {
-    const attribute = input?.cart?.attributes?.find(
-      (attr) => attr.key === "paystoneGiftVoucher"
+    const attr = input?.cart?.attributes?.find(
+      (a) => a.key === "paystoneBalance" // ⚠️ MUST MATCH EXTENSION
     );
 
-    balance = parseFloat(attribute?.value || "0");
+    balance = parseFloat(attr?.value || "0");
   } catch (e) {
     balance = 0;
   }
 
-  console.log("💰 Balance from attributes:", balance);
+  console.log("💰 Balance:", balance);
 
   if (!balance || balance <= 0) {
-    console.log("❌ No balance → No discount applied");
+    console.log("❌ No balance");
     return { operations: [] };
   }
 
   /* =========================
      CART TOTAL
   ========================= */
-  const cartTotal = parseFloat(input?.cart?.cost?.totalAmount?.amount || "0");
+  const cartTotal = parseFloat(
+    input?.cart?.cost?.totalAmount?.amount || "0"
+  );
 
-  console.log("Cart Total:", cartTotal);
+  console.log("🛒 Cart Total:", cartTotal);
 
   const discountAmount = Math.min(balance, cartTotal);
 
-  console.log("Discount Amount:", discountAmount);
-
-  const operations = [];
+  console.log("💸 Discount:", discountAmount);
 
   /* =========================
      APPLY ORDER DISCOUNT
   ========================= */
-  if (input.discount.discountClasses.includes(DiscountClass.Order)) {
-    console.log("✅ Applying ORDER discount");
-
-    operations.push({
-      orderDiscountsAdd: {
-        candidates: [
-          {
-            message: `Voucher Applied (₹${discountAmount})`,
-            targets: [
+  if (
+    input.discount.discountClasses.includes(DiscountClass.Order)
+  ) {
+    return {
+      operations: [
+        {
+          orderDiscountsAdd: {
+            candidates: [
               {
-                orderSubtotal: {
-                  excludedCartLineIds: [],
+                message: `Voucher Applied (₹${discountAmount})`,
+                targets: [
+                  {
+                    orderSubtotal: {
+                      excludedCartLineIds: [],
+                    },
+                  },
+                ],
+                value: {
+                  fixedAmount: {
+                    amount: discountAmount,
+                  },
                 },
               },
             ],
-            value: {
-              fixedAmount: {
-                amount: discountAmount,
-              },
-            },
+            selectionStrategy:
+              OrderDiscountSelectionStrategy.First,
           },
-        ],
-        selectionStrategy: OrderDiscountSelectionStrategy.First,
-      },
-    });
+        },
+      ],
+    };
   }
 
-  /* =========================
-     APPLY PRODUCT DISCOUNT (Fallback)
-  ========================= */
-  else if (input.discount.discountClasses.includes(DiscountClass.Product)) {
-    console.log("✅ Applying PRODUCT discount");
-
-    const perLineDiscount =
-      discountAmount / (input.cart.lines.length || 1);
-
-    operations.push({
-      productDiscountsAdd: {
-        candidates: input.cart.lines.map((line) => ({
-          message: `Voucher Applied`,
-          targets: [
-            {
-              cartLine: {
-                id: line.id,
-              },
-            },
-          ],
-          value: {
-            fixedAmount: {
-              amount: perLineDiscount,
-            },
-          },
-        })),
-        selectionStrategy: ProductDiscountSelectionStrategy.First,
-      },
-    });
-  }
-
-  /* =========================
-     FINAL RETURN
-  ========================= */
-  console.log("🎯 FINAL OPERATIONS:", operations);
-
-  return { operations };
+  return { operations: [] };
 }

@@ -1,17 +1,18 @@
 query CartInput {
   cart {
-    attribute(key: "paystoneGiftVoucher") {
+    attributes {
       key
       value
     }
 
+    cost {
+      totalAmount {
+        amount
+      }
+    }
+
     lines {
       id
-      cost {
-        subtotalAmount {
-          amount
-        }
-      }
     }
   }
 
