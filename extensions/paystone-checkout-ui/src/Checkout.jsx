@@ -226,7 +226,7 @@ async function handleApply() {
     // ✅ SAVE BALANCE (VERY IMPORTANT)
     await shopify.applyAttributeChange({
       type: "updateAttribute",
-      key: "paystoneBalance",
+      key: "paystoneGiftVoucher",
       value: String(balance),
     });
 
