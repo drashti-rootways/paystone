@@ -103,7 +103,7 @@ function Extension() {
   const [loading, setLoading] = useState(false);
   const [config, setConfig] = useState(null);
   const [pin, setPin] = useState('');
-  const shouldShowPin = config?.skipPinVerification === true;
+  const shouldShowPin = config?.skipPinVerification === false;
 
   useEffect(() => {
     if (!voucher.trim()) {
@@ -129,12 +129,37 @@ function Extension() {
     );
   }
 
+  function getCheckoutTotalAmount() {
+    try {
+      const total =
+        shopify?.cost?.totalAmount?.value?.amount ??
+        shopify?.cost?.totalAmount?.current?.amount ??
+        '0';
+
+      const parsed = parseFloat(total || '0');
+      console.log('[Paystone] Checkout total amount:', parsed);
+      return Number.isFinite(parsed) ? parsed : 0;
+    } catch (err) {
+      console.error('[Paystone] Failed to read checkout total:', err);
+      return 0;
+    }
+  }
+
+  function getShopDomain() {
+    const domain =
+      shopify?.shop?.myshopifyDomain ||
+      'rootways-plus-demo.myshopify.com';
+
+    console.log('[Paystone] Shop domain:', domain);
+    return domain;
+  }
+
   /**
    * 🔹 FETCH DATABASE CONFIG FROM app.paystoneapi-config
    */
 async function fetchPaystoneConfigFromDB(voucherCode, pinValue = "") {
   try {
-    const shopDomain = "rootways-plus-demo.myshopify.com";
+    const shopDomain = getShopDomain();
     const API_BASE = "https://paystone.vercel.app";
 
     const url =
@@ -179,7 +204,7 @@ async function handleApply() {
     return;
   }
 
-  if (config?.skipPinVerification && !pin.trim()) {
+  if (shouldShowPin && !pin.trim()) {
     setError("Please enter PIN.");
     return;
   }
@@ -188,8 +213,14 @@ async function handleApply() {
   setLoading(true);
 
   try {
+    console.log('[Paystone] Apply started', { voucher, hasPin: Boolean(pin) });
+
     // ✅ STEP 1: Get Paystone URL
     const data = await fetchPaystoneConfigFromDB(voucher, pin);
+    if (!data?.success || !data?.paystoneUrl) {
+      console.error('[Paystone] Config API failed:', data);
+      throw new Error('Paystone config not found');
+    }
 
     const paystoneUrl = data?.paystoneUrl;
 
@@ -218,7 +249,70 @@ async function handleApply() {
 
     // ❌ Invalid voucher
     if (!balance || balance <= 0) {
+      await shopify.applyAttributeChange({
+        type: "updateAttribute",
+        key: "paystoneBalance",
+        value: "0",
+      });
+
+      await shopify.applyAttributeChange({
+        type: "updateAttribute",
+        key: "paystoneLock",
+        value: "",
+      });
+
       setError("Invalid or empty voucher");
+      console.log('[Paystone] Stopping because balance is empty');
+      setLoading(false);
+      return;
+    }
+
+    const checkoutTotal = getCheckoutTotalAmount();
+    const lockAmount = Math.min(balance, checkoutTotal);
+
+    console.log('[Paystone] Lock calculation', {
+      balance,
+      checkoutTotal,
+      lockAmount,
+    });
+
+    if (!lockAmount || lockAmount <= 0) {
+      setError('Unable to calculate lock amount.');
+      console.log('[Paystone] Lock amount invalid, stopping');
+      setLoading(false);
+      return;
+    }
+
+    console.log('[Paystone] Starting LOC + CMT request');
+    const transactionRes = await fetch(`${API_BASE}/app/paystone-transaction`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        shop: getShopDomain(),
+        voucher,
+        pin,
+        amount: lockAmount.toFixed(2),
+      }),
+    });
+
+    const transactionData = await transactionRes.json();
+    console.log('[Paystone] LOC + CMT response:', transactionData);
+
+    if (!transactionData?.success || !transactionData?.lockData) {
+      const message =
+        transactionData?.error ||
+        `Voucher transaction failed at ${transactionData?.step || 'unknown step'}`;
+      console.error('[Paystone] LOC + CMT failed:', message);
+
+      await shopify.applyAttributeChange({
+        type: "updateAttribute",
+        key: "paystoneLock",
+        value: "",
+      });
+
+      setError(message);
       setLoading(false);
       return;
     }
@@ -229,6 +323,14 @@ async function handleApply() {
       key: "paystoneBalance",
       value: String(balance),
     });
+    console.log('[Paystone] paystoneBalance attribute saved');
+
+    await shopify.applyAttributeChange({
+      type: "updateAttribute",
+      key: "paystoneLock",
+      value: JSON.stringify(transactionData.lockData),
+    });
+    console.log('[Paystone] paystoneLock attribute saved');
 
     // (Optional) save voucher info
     await shopify.applyAttributeChange({
@@ -237,8 +339,14 @@ async function handleApply() {
       value: JSON.stringify({
         voucherCode: voucher,
         pin,
+        cid: voucher,
+        balance,
+        lockedAmount: transactionData.lockData.amt,
+        tcr: transactionData.lockData.tcr,
+        inv: transactionData.lockData.inv,
       }),
     });
+    console.log('[Paystone] paystoneConfig attribute saved');
 
    console.log("✅ Balance saved → Triggering cart update");
 
@@ -248,9 +356,10 @@ async function handleApply() {
       key: "paystoneTrigger",
       value: String(Date.now()), // always new → forces refresh
     });
+    console.log('[Paystone] paystoneTrigger updated');
 
   } catch (err) {
-    console.error(err);
+    console.error('[Paystone] handleApply error:', err);
     setError('Failed to apply voucher.');
   } finally {
     setLoading(false);
@@ -266,11 +375,19 @@ async function handleRemove() {
   setLoading(true);
 
   try {
+    console.log('[Paystone] Removing voucher and clearing attributes');
+
     // ❌ REMOVE BALANCE (MOST IMPORTANT)
     await shopify.applyAttributeChange({
       type: "updateAttribute",
       key: "paystoneBalance",
       value: "0", // or "" both work
+    });
+
+    await shopify.applyAttributeChange({
+      type: "updateAttribute",
+      key: "paystoneLock",
+      value: "",
     });
 
     // (optional) remove config
