@@ -13,13 +13,29 @@ function safeJson(data) {
 }
 
 function getGatewayBaseUrl(config) {
-  const configuredBase = (config.gatewayUrl || "").trim().replace(/\/$/, "");
+  const rawGatewayUrl = (config.gatewayUrl || "").trim();
 
-  if (configuredBase) {
-    return `${configuredBase}/${config.clientAccessKey}/fit/`;
+  if (!rawGatewayUrl) {
+    return `https://rootways.dcuat.com/ms2v2/trx/${config.clientAccessKey}/fit/`;
   }
 
-  return `https://rootways.dcuat.com/ms2v2/trx/${config.clientAccessKey}/fit/`;
+  const normalizedGatewayUrl = /^https?:\/\//i.test(rawGatewayUrl)
+    ? rawGatewayUrl
+    : `https://${rawGatewayUrl}`;
+
+  const configuredBase = normalizedGatewayUrl.replace(/\/$/, "");
+
+  if (configuredBase) {
+    if (/\/fit$/i.test(configuredBase) || /\/fit\/$/i.test(normalizedGatewayUrl)) {
+      return `${configuredBase.replace(/\/$/, "")}/`;
+    }
+
+    if (/\/trx$/i.test(configuredBase) || /\/trx\/$/i.test(normalizedGatewayUrl)) {
+      return `${configuredBase}/${config.clientAccessKey}/fit/`;
+    }
+
+    return `${configuredBase}/ms2v2/trx/${config.clientAccessKey}/fit/`;
+  }
 }
 
 function buildPaystoneUrl({ config, trx, pin, cid, amount, tcr, inv }) {
