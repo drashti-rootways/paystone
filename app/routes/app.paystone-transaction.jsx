@@ -352,6 +352,18 @@ async function cancelAndCommit({ config, voucher, pin, amount, tcr, inv }) {
   const cancelResponse = await callPaystone(cancelUrl, "CCL");
 
   if (!cancelResponse.parsed.TCN) {
+    if (cancelResponse.parsed.RES === "108") {
+      console.log("[Paystone] CCL returned invalid transaction, falling back to RUL");
+      return unlockAndCommit({
+        config,
+        voucher,
+        pin,
+        amount,
+        tcr,
+        inv,
+      });
+    }
+
     console.log("[Paystone] CCL failed before commit");
     return jsonResponse({
       success: false,
