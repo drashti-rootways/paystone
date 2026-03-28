@@ -82,6 +82,35 @@ function buildPaystoneUrl({ config, trx, pin, cid, amount, tcr, inv }) {
   return `${getGatewayBaseUrl(config)}?${params.toString()}`;
 }
 
+async function checkBalance({ config, voucher, pin, label = "BAL" }) {
+  console.log("[Paystone] Starting balance check", {
+    voucher,
+    pinPresent: Boolean(pin),
+    label,
+  });
+
+  const balanceUrl = buildPaystoneUrl({
+    config,
+    trx: "bal",
+    pin,
+    cid: voucher,
+  });
+
+  const balanceResponse = await callPaystone(balanceUrl, label);
+  const parsedBalance = Number.parseFloat(balanceResponse.parsed.BAL || "0");
+
+  console.log("[Paystone] Balance check result", {
+    label,
+    parsedBalance,
+    parsed: balanceResponse.parsed,
+  });
+
+  return {
+    response: balanceResponse,
+    balance: Number.isFinite(parsedBalance) ? parsedBalance : 0,
+  };
+}
+
 function parsePaystoneResponse(raw) {
   const response = {};
 
@@ -241,6 +270,13 @@ async function lockAndCommit({ config, voucher, pin, requestedAmount }) {
 
   console.log("[Paystone] Transaction complete", lockData);
 
+  const postLockBalance = await checkBalance({
+    config,
+    voucher,
+    pin,
+    label: "BAL_AFTER_LOCK",
+  });
+
   return jsonResponse({
     success: true,
     step: "done",
@@ -248,6 +284,8 @@ async function lockAndCommit({ config, voucher, pin, requestedAmount }) {
     lockData,
     lockResponse,
     commitResponse,
+    balanceCheck: postLockBalance.response,
+    availableBalance: postLockBalance.balance,
   });
 }
 
@@ -310,6 +348,13 @@ async function unlockAndCommit({ config, voucher, pin, amount, tcr, inv }) {
     inv,
   });
 
+  const postUnlockBalance = await checkBalance({
+    config,
+    voucher,
+    pin,
+    label: "BAL_AFTER_UNLOCK",
+  });
+
   return jsonResponse({
     success: true,
     step: "done",
@@ -327,6 +372,8 @@ async function unlockAndCommit({ config, voucher, pin, amount, tcr, inv }) {
     },
     unlockResponse,
     commitResponse,
+    balanceCheck: postUnlockBalance.response,
+    availableBalance: postUnlockBalance.balance,
   });
 }
 
@@ -401,6 +448,13 @@ async function cancelAndCommit({ config, voucher, pin, amount, tcr, inv }) {
     inv,
   });
 
+  const postCancelBalance = await checkBalance({
+    config,
+    voucher,
+    pin,
+    label: "BAL_AFTER_CANCEL",
+  });
+
   return jsonResponse({
     success: true,
     step: "done",
@@ -418,6 +472,8 @@ async function cancelAndCommit({ config, voucher, pin, amount, tcr, inv }) {
     },
     cancelResponse,
     commitResponse,
+    balanceCheck: postCancelBalance.response,
+    availableBalance: postCancelBalance.balance,
   });
 }
 

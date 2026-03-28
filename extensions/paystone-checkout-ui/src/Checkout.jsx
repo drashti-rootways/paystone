@@ -324,6 +324,7 @@ async function handleApply() {
 
     const transactionData = await transactionRes.json();
     console.log('[Paystone] LOC + CMT response:', transactionData);
+    console.log('[Paystone] Balance after lock:', transactionData?.availableBalance);
 
     if (!transactionData?.success || !transactionData?.lockData) {
       const message =
@@ -425,6 +426,7 @@ async function handleRemove() {
 
       const unlockData = await unlockRes.json();
       console.log('[Paystone] Cancel response:', unlockData);
+      console.log('[Paystone] Balance after remove:', unlockData?.availableBalance);
 
       if (!unlockData?.success) {
         const message =
