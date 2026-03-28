@@ -119,6 +119,30 @@ export function options() {
   });
 }
 
+export async function loader({ request }) {
+  if (request.method === "OPTIONS") {
+    console.log("[Paystone] OPTIONS preflight received");
+    return new Response(null, {
+      status: 204,
+      headers: corsHeaders,
+    });
+  }
+
+  return new Response(
+    safeJson({
+      success: false,
+      error: "Method not allowed",
+    }),
+    {
+      status: 405,
+      headers: {
+        "Content-Type": "application/json",
+        ...corsHeaders,
+      },
+    }
+  );
+}
+
 export async function action({ request }) {
   try {
     const body = await request.json();
