@@ -154,6 +154,31 @@ function Extension() {
     return domain;
   }
 
+  function getSavedLockData() {
+    try {
+      const attributes =
+        shopify?.attributes?.value ||
+        shopify?.attributes?.current ||
+        [];
+
+      const lockAttribute = attributes.find(
+        (attribute) => attribute.key === 'paystoneLock'
+      );
+
+      if (!lockAttribute?.value) {
+        console.log('[Paystone] No saved paystoneLock attribute found');
+        return null;
+      }
+
+      const parsed = JSON.parse(lockAttribute.value);
+      console.log('[Paystone] Loaded paystoneLock attribute:', parsed);
+      return parsed;
+    } catch (err) {
+      console.error('[Paystone] Failed to parse paystoneLock attribute:', err);
+      return null;
+    }
+  }
+
   /**
    * 🔹 FETCH DATABASE CONFIG FROM app.paystoneapi-config
    */
@@ -376,6 +401,45 @@ async function handleRemove() {
 
   try {
     console.log('[Paystone] Removing voucher and clearing attributes');
+    const API_BASE = "https://paystone.vercel.app";
+    const lockData = getSavedLockData();
+
+    if (lockData?.cid && lockData?.amt && lockData?.tcr && lockData?.inv) {
+      console.log('[Paystone] Starting unlock flow with saved lock data', lockData);
+
+      const unlockRes = await fetch(`${API_BASE}/app/paystone-transaction`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'unlock',
+          shop: getShopDomain(),
+          voucher: lockData.cid,
+          pin: lockData.pin || '',
+          amount: lockData.amt,
+          tcr: lockData.tcr,
+          inv: lockData.inv,
+        }),
+      });
+
+      const unlockData = await unlockRes.json();
+      console.log('[Paystone] Unlock response:', unlockData);
+
+      if (!unlockData?.success) {
+        const message =
+          unlockData?.error ||
+          `Voucher unlock failed at ${unlockData?.step || 'unknown step'}`;
+        console.error('[Paystone] Unlock failed:', message);
+        setError(message);
+        setLoading(false);
+        return;
+      }
+
+      console.log('[Paystone] Unlock completed successfully');
+    } else {
+      console.log('[Paystone] No lock data found, skipping unlock API call');
+    }
 
     // ❌ REMOVE BALANCE (MOST IMPORTANT)
     await shopify.applyAttributeChange({

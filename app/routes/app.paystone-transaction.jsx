@@ -128,6 +128,208 @@ async function callPaystone(url, label) {
   };
 }
 
+function jsonResponse(data, status = 200) {
+  return new Response(safeJson(data), {
+    status,
+    headers: {
+      "Content-Type": "application/json",
+      ...corsHeaders,
+    },
+  });
+}
+
+async function getShopConfig(shop) {
+  const shopRecord = await prisma.shop.findUnique({
+    where: { shopDomain: shop },
+  });
+
+  if (!shopRecord) {
+    return {
+      error: jsonResponse(
+        {
+          success: false,
+          error: "Shop not found",
+        },
+        404
+      ),
+    };
+  }
+
+  const config = await prisma.paystoneConfig.findUnique({
+    where: { shopId: shopRecord.id },
+  });
+
+  if (!config) {
+    return {
+      error: jsonResponse(
+        {
+          success: false,
+          error: "Paystone config not found",
+        },
+        404
+      ),
+    };
+  }
+
+  return {config};
+}
+
+async function lockAndCommit({ config, voucher, pin, requestedAmount }) {
+  const inv = generateInvoice();
+
+  console.log("[Paystone] Starting LOC transaction", {
+    voucher,
+    pinPresent: Boolean(pin),
+    requestedAmount,
+    inv,
+  });
+
+  const lockUrl = buildPaystoneUrl({
+    config,
+    trx: "loc",
+    pin,
+    cid: voucher,
+    amount: requestedAmount.toFixed(2),
+    inv,
+  });
+
+  const lockResponse = await callPaystone(lockUrl, "LOC");
+
+  if (!lockResponse.parsed.TCN) {
+    console.log("[Paystone] LOC failed before commit");
+    return jsonResponse({
+      success: false,
+      step: "loc",
+      error: lockResponse.parsed.MSG || "Failed to lock voucher amount",
+      lockResponse,
+    });
+  }
+
+  const commitUrl = buildPaystoneUrl({
+    config,
+    trx: "cmt",
+    pin,
+    cid: voucher,
+    tcr: lockResponse.parsed.TCN,
+  });
+
+  const commitResponse = await callPaystone(commitUrl, "CMT");
+
+  if (!commitResponse.parsed.TCR) {
+    console.log("[Paystone] Commit failed after lock");
+    return jsonResponse({
+      success: false,
+      step: "cmt",
+      error: commitResponse.parsed.MSG || "Failed to commit locked voucher amount",
+      lockResponse,
+      commitResponse,
+    });
+  }
+
+  const lockData = {
+    status: 1,
+    msg: "",
+    updated_at: new Date().toISOString(),
+    amt: requestedAmount.toFixed(2),
+    cid: voucher,
+    pin,
+    tcr: commitResponse.parsed.TCR,
+    inv,
+    tcn: lockResponse.parsed.TCN,
+    voucherCode: voucher,
+  };
+
+  console.log("[Paystone] Transaction complete", lockData);
+
+  return jsonResponse({
+    success: true,
+    step: "done",
+    action: "lock",
+    lockData,
+    lockResponse,
+    commitResponse,
+  });
+}
+
+async function unlockAndCommit({ config, voucher, pin, amount, tcr, inv }) {
+  console.log("[Paystone] Starting RUL transaction", {
+    voucher,
+    pinPresent: Boolean(pin),
+    amount,
+    tcr,
+    inv,
+  });
+
+  const unlockUrl = buildPaystoneUrl({
+    config,
+    trx: "rul",
+    pin,
+    cid: voucher,
+    amount,
+    tcr,
+    inv,
+  });
+
+  const unlockResponse = await callPaystone(unlockUrl, "RUL");
+
+  if (!unlockResponse.parsed.TCN) {
+    console.log("[Paystone] RUL failed before commit");
+    return jsonResponse({
+      success: false,
+      step: "rul",
+      error: unlockResponse.parsed.MSG || "Failed to unlock voucher amount",
+      unlockResponse,
+    });
+  }
+
+  const commitUrl = buildPaystoneUrl({
+    config,
+    trx: "cmt",
+    pin,
+    cid: voucher,
+    tcr: unlockResponse.parsed.TCN,
+  });
+
+  const commitResponse = await callPaystone(commitUrl, "CMT_UNLOCK");
+
+  if (!commitResponse.parsed.TCR) {
+    console.log("[Paystone] Commit failed after unlock");
+    return jsonResponse({
+      success: false,
+      step: "cmt_unlock",
+      error: commitResponse.parsed.MSG || "Failed to commit unlocked voucher amount",
+      unlockResponse,
+      commitResponse,
+    });
+  }
+
+  console.log("[Paystone] Unlock complete", {
+    voucher,
+    amount,
+    tcr: commitResponse.parsed.TCR,
+    inv,
+  });
+
+  return jsonResponse({
+    success: true,
+    step: "done",
+    action: "unlock",
+    unlockData: {
+      status: 1,
+      msg: "",
+      updated_at: new Date().toISOString(),
+      amt: String(amount),
+      cid: voucher,
+      pin,
+      tcr: commitResponse.parsed.TCR,
+      inv,
+      voucherCode: voucher,
+    },
+    unlockResponse,
+    commitResponse,
+  });
+}
+
 export function options() {
   return new Response(null, {
     status: 204,
@@ -163,202 +365,70 @@ export async function action({ request }) {
   try {
     const body = await request.json();
     const {
+      action: transactionAction = "lock",
       shop,
       voucher,
       pin = "",
       amount,
+      tcr,
+      inv,
     } = body || {};
 
     console.log("[Paystone] Transaction request body:", body);
 
     if (!shop || !voucher) {
-      return new Response(
-        safeJson({
+      return jsonResponse({
           success: false,
           error: "Missing shop or voucher",
-        }),
-        {
-          status: 400,
-          headers: {
-            "Content-Type": "application/json",
-            ...corsHeaders,
-          },
-        }
-      );
+        }, 400);
+    }
+    const configResult = await getShopConfig(shop);
+    if (configResult.error) {
+      return configResult.error;
+    }
+
+    const {config} = configResult;
+
+    if (transactionAction === "unlock") {
+      const unlockAmount = Number.parseFloat(amount || "0");
+
+      if (!Number.isFinite(unlockAmount) || unlockAmount <= 0 || !tcr || !inv) {
+        return jsonResponse({
+          success: false,
+          error: "Invalid unlock payload. Amount, TCR and INV are required.",
+        }, 400);
+      }
+
+      return unlockAndCommit({
+        config,
+        voucher,
+        pin,
+        amount: unlockAmount.toFixed(2),
+        tcr,
+        inv,
+      });
     }
 
     const requestedAmount = Number.parseFloat(amount || "0");
     if (!Number.isFinite(requestedAmount) || requestedAmount <= 0) {
-      return new Response(
-        safeJson({
-          success: false,
-          error: "Invalid amount requested for lock",
-        }),
-        {
-          status: 400,
-          headers: {
-            "Content-Type": "application/json",
-            ...corsHeaders,
-          },
-        }
-      );
+      return jsonResponse({
+        success: false,
+        error: "Invalid amount requested for lock",
+      }, 400);
     }
 
-    const shopRecord = await prisma.shop.findUnique({
-      where: { shopDomain: shop },
-    });
-
-    if (!shopRecord) {
-      return new Response(
-        safeJson({
-          success: false,
-          error: "Shop not found",
-        }),
-        {
-          status: 404,
-          headers: {
-            "Content-Type": "application/json",
-            ...corsHeaders,
-          },
-        }
-      );
-    }
-
-    const config = await prisma.paystoneConfig.findUnique({
-      where: { shopId: shopRecord.id },
-    });
-
-    if (!config) {
-      return new Response(
-        safeJson({
-          success: false,
-          error: "Paystone config not found",
-        }),
-        {
-          status: 404,
-          headers: {
-            "Content-Type": "application/json",
-            ...corsHeaders,
-          },
-        }
-      );
-    }
-
-    const inv = generateInvoice();
-
-    console.log("[Paystone] Starting LOC transaction", {
+    return lockAndCommit({
+      config,
       voucher,
-      pinPresent: Boolean(pin),
+      pin,
       requestedAmount,
-      inv,
     });
-
-    const lockUrl = buildPaystoneUrl({
-      config,
-      trx: "loc",
-      pin,
-      cid: voucher,
-      amount: requestedAmount.toFixed(2),
-      inv,
-    });
-
-    const lockResponse = await callPaystone(lockUrl, "LOC");
-
-    if (!lockResponse.parsed.TCN) {
-      console.log("[Paystone] LOC failed before commit");
-      return new Response(
-        safeJson({
-          success: false,
-          step: "loc",
-          error: lockResponse.parsed.MSG || "Failed to lock voucher amount",
-          lockResponse,
-        }),
-        {
-          status: 200,
-          headers: {
-            "Content-Type": "application/json",
-            ...corsHeaders,
-          },
-        }
-      );
-    }
-
-    const commitUrl = buildPaystoneUrl({
-      config,
-      trx: "cmt",
-      pin,
-      cid: voucher,
-      tcr: lockResponse.parsed.TCN,
-    });
-
-    const commitResponse = await callPaystone(commitUrl, "CMT");
-
-    if (!commitResponse.parsed.TCR) {
-      console.log("[Paystone] Commit failed after lock");
-      return new Response(
-        safeJson({
-          success: false,
-          step: "cmt",
-          error: commitResponse.parsed.MSG || "Failed to commit locked voucher amount",
-          lockResponse,
-          commitResponse,
-        }),
-        {
-          status: 200,
-          headers: {
-            "Content-Type": "application/json",
-            ...corsHeaders,
-          },
-        }
-      );
-    }
-
-    const lockData = {
-      status: 1,
-      msg: "",
-      updated_at: new Date().toISOString(),
-      amt: requestedAmount.toFixed(2),
-      cid: voucher,
-      pin,
-      tcr: commitResponse.parsed.TCR,
-      inv,
-      tcn: lockResponse.parsed.TCN,
-      voucherCode: voucher,
-    };
-
-    console.log("[Paystone] Transaction complete", lockData);
-
-    return new Response(
-      safeJson({
-        success: true,
-        step: "done",
-        lockData,
-        lockResponse,
-        commitResponse,
-      }),
-      {
-        status: 200,
-        headers: {
-          "Content-Type": "application/json",
-          ...corsHeaders,
-        },
-      }
-    );
   } catch (error) {
     console.error("[Paystone] Transaction error:", error);
 
-    return new Response(
-      safeJson({
+    return jsonResponse({
         success: false,
         error: error.message || "Internal Server Error",
-      }),
-      {
-        status: 500,
-        headers: {
-          "Content-Type": "application/json",
-          ...corsHeaders,
-        },
-      }
-    );
+      }, 500);
   }
 }
