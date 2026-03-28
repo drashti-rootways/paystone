@@ -405,7 +405,7 @@ async function handleRemove() {
     const lockData = getSavedLockData();
 
     if (lockData?.cid && lockData?.amt && lockData?.tcr && lockData?.inv) {
-      console.log('[Paystone] Starting unlock flow with saved lock data', lockData);
+      console.log('[Paystone] Starting cancel flow with saved lock data', lockData);
 
       const unlockRes = await fetch(`${API_BASE}/app/paystone-transaction`, {
         method: 'POST',
@@ -413,7 +413,7 @@ async function handleRemove() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          action: 'unlock',
+          action: 'cancel',
           shop: getShopDomain(),
           voucher: lockData.cid,
           pin: lockData.pin || '',
@@ -424,21 +424,21 @@ async function handleRemove() {
       });
 
       const unlockData = await unlockRes.json();
-      console.log('[Paystone] Unlock response:', unlockData);
+      console.log('[Paystone] Cancel response:', unlockData);
 
       if (!unlockData?.success) {
         const message =
           unlockData?.error ||
-          `Voucher unlock failed at ${unlockData?.step || 'unknown step'}`;
-        console.error('[Paystone] Unlock failed:', message);
+          `Voucher cancel failed at ${unlockData?.step || 'unknown step'}`;
+        console.error('[Paystone] Cancel failed:', message);
         setError(message);
         setLoading(false);
         return;
       }
 
-      console.log('[Paystone] Unlock completed successfully');
+      console.log('[Paystone] Cancel completed successfully');
     } else {
-      console.log('[Paystone] No lock data found, skipping unlock API call');
+      console.log('[Paystone] No lock data found, skipping cancel API call');
     }
 
     // ❌ REMOVE BALANCE (MOST IMPORTANT)

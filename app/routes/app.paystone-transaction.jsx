@@ -330,6 +330,85 @@ async function unlockAndCommit({ config, voucher, pin, amount, tcr, inv }) {
   });
 }
 
+async function cancelAndCommit({ config, voucher, pin, amount, tcr, inv }) {
+  console.log("[Paystone] Starting CCL transaction", {
+    voucher,
+    pinPresent: Boolean(pin),
+    amount,
+    tcr,
+    inv,
+  });
+
+  const cancelUrl = buildPaystoneUrl({
+    config,
+    trx: "ccl",
+    pin,
+    cid: voucher,
+    amount,
+    tcr,
+    inv,
+  });
+
+  const cancelResponse = await callPaystone(cancelUrl, "CCL");
+
+  if (!cancelResponse.parsed.TCN) {
+    console.log("[Paystone] CCL failed before commit");
+    return jsonResponse({
+      success: false,
+      step: "ccl",
+      error: cancelResponse.parsed.MSG || "Failed to cancel voucher transaction",
+      cancelResponse,
+    });
+  }
+
+  const commitUrl = buildPaystoneUrl({
+    config,
+    trx: "cmt",
+    pin,
+    cid: voucher,
+    tcr: cancelResponse.parsed.TCN,
+  });
+
+  const commitResponse = await callPaystone(commitUrl, "CMT_CANCEL");
+
+  if (!commitResponse.parsed.TCR) {
+    console.log("[Paystone] Commit failed after cancel");
+    return jsonResponse({
+      success: false,
+      step: "cmt_cancel",
+      error: commitResponse.parsed.MSG || "Failed to commit voucher cancel",
+      cancelResponse,
+      commitResponse,
+    });
+  }
+
+  console.log("[Paystone] Cancel complete", {
+    voucher,
+    amount,
+    tcr: commitResponse.parsed.TCR,
+    inv,
+  });
+
+  return jsonResponse({
+    success: true,
+    step: "done",
+    action: "cancel",
+    cancelData: {
+      status: 1,
+      msg: "",
+      updated_at: new Date().toISOString(),
+      amt: String(amount),
+      cid: voucher,
+      pin,
+      tcr: commitResponse.parsed.TCR,
+      inv,
+      voucherCode: voucher,
+    },
+    cancelResponse,
+    commitResponse,
+  });
+}
+
 export function options() {
   return new Response(null, {
     status: 204,
@@ -404,6 +483,26 @@ export async function action({ request }) {
         voucher,
         pin,
         amount: unlockAmount.toFixed(2),
+        tcr,
+        inv,
+      });
+    }
+
+    if (transactionAction === "cancel") {
+      const cancelAmount = Number.parseFloat(amount || "0");
+
+      if (!Number.isFinite(cancelAmount) || cancelAmount <= 0 || !tcr || !inv) {
+        return jsonResponse({
+          success: false,
+          error: "Invalid cancel payload. Amount, TCR and INV are required.",
+        }, 400);
+      }
+
+      return cancelAndCommit({
+        config,
+        voucher,
+        pin,
+        amount: cancelAmount.toFixed(2),
         tcr,
         inv,
       });
